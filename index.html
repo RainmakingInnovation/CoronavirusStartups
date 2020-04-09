@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dashboard</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.0.1/spin.min.js"></script>
+    <script
+      src="https://kit.fontawesome.com/ea2379d57d.js"
+      crossorigin="anonymous"
+    ></script>
+    <link rel="icon" href="assets/favicon.ico" />
+    <style type="text/css">
+      @font-face {
+        font-family: "Graphik Regular";
+        font-style: normal;
+        font-weight: normal;
+        src: local("Graphik Regular"), url("GraphikRegular.woff") format("woff");
+      }
+
+      @font-face {
+        font-family: "Graphik Bold";
+        font-style: normal;
+        font-weight: bold;
+        src: local("Graphik Bold"), url("GraphikBold.woff") format("woff");
+      }
+
+      .title-text {
+        font-size: 1.2em;
+        font-weight: bold;
+        font-family: "Graphik Bold";
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="node-tooltip">
+      <div class="node-tooltip-title"></div>
+      <div class="node-tooltip-description"></div>
+    </div>
+    <div id="chart-container"></div>
+
+    <script>
+      // set the dimensions and margins of the graph
+      var margin = { top: 10, right: 20, bottom: 20, left: 10 },
+        width = window.innerWidth - margin.left - margin.right,
+        height = window.innerHeight - margin.top - margin.bottom,
+        rainmakingLogoLength = 5;
+
+      // loader settings
+      var opts = {
+        lines: 9, // The number of lines to draw
+        length: 7, // The length of each line
+        width: 8, // The line thickness
+        radius: 24, // The radius of the inner circle
+        top: "57%",
+        left: "38.5%",
+        color: "#132A54", // #rgb or #rrggbb or array of colors
+        speed: 1.9, // Rounds per second
+        trail: 40, // Afterglow percentage
+        className: "spinner", // The CSS class to assign to the spinner
+      };
+
+      var target = document.getElementById("chart-container");
+
+      var spinner = new Spinner(opts).spin(target);
+
+      // append the svg object to the body of the page
+      var svg = d3
+        .select("#chart-container")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      d3.csv(
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-BAWGg0c1wQ5NVrvOTEBhRqGnTJUZn8jAofUum8kVS2E-ji8rjncAZAUQJvRb5dDUbVRM1qXbgeAV/pub?gid=613487733&single=true&output=csv "
+      ).then(function (data) {
+        spinner.stop();
+
+        data = data.filter(function (d) {
+          return d["To Include"] === "TRUE";
+        });
+
+        // Filter data for startups noot in description:
+        new_data = [];
+        data.forEach(function (d) {
+          if (d["Company"] === "") {
+            console.log("ERROR, blank Company Entry:", d);
+          } else {
+            new_data.push(d);
+          }
+        });
+
+        data = new_data;
+
+        console.log("data", data);
+
+        var themes = d3
+          .nest()
+          .key(function (d) {
+            return d["Theme"];
+          })
+          .entries(data);
+
+        themes.forEach(function (v) {
+          var size = v.values.length;
+          v.values.forEach(function (w) {
+            if (size === 1) {
+              w.value = 3;
+            } else {
+              if (size === 2) {
+                w.value = 1.5;
+              } else {
+                w.value = 1;
+              }
+            }
+          });
+        });
+
+        data.push({ Company: "origin", Theme: "", value: "" });
+
+        themes.splice(Math.floor(themes.length / 3), 0, {
+          key: "rainmaking",
+          values: [],
+        });
+
+        console.log("themes", themes);
+
+        themes.forEach(function (v) {
+          data.push({ Company: v.key, Theme: "origin", value: "" });
+        });
+
+        for (let i = 0; i < rainmakingLogoLength; i++) {
+          data.push({
+            Company: "rainmaking-" + i,
+            Theme: "rainmaking",
+            value: 1,
+          });
+        }
+
+        // stratify the data: reformatting for d3.js
+        var root = d3
+          .stratify()
+          .id(function (d) {
+            return d.Company;
+          })
+          .parentId(function (d) {
+            return d.Theme;
+          })(data);
+
+        // Give the data to this cluster layout:
+        root.sum(function (d) {
+          return +d.value;
+        });
+
+        d3
+          .treemap()
+          .tile(d3.treemapSquarify.ratio(2))
+          .size([width, height])
+          .padding(10)(root);
+
+        console.log("root.leaves()", root.leaves());
+
+        // use this information to add rectangles:
+        svg
+          .selectAll("rect")
+          .data(root.leaves())
+          .enter()
+          .append("rect")
+          .attr("x", function (d) {
+            return d.x0;
+          })
+          .attr("y", function (d) {
+            return d.y0;
+          })
+          .attr("width", function (d) {
+            return d.x1 - d.x0;
+          })
+          .attr("height", function (d) {
+            return d.y1 - d.y0;
+          })
+          .attr("id", function (d) {
+            return d.id.replace(/ /g, "-");
+          })
+          .attr("class", function (d) {
+            return "startup-block";
+          })
+          .attr("fill", function (d) {
+            if (d.parent.id === "rainmaking") {
+              return "#EAC435";
+            } else {
+              return "#345995";
+            }
+          })
+          .attr("opacity", 0);
+
+        themes.forEach(function (v) {
+          v.x0 = 0;
+          v.y0 = 0;
+          v.x1 = 0;
+          v.y1 = 0;
+        });
+
+        // get dims:
+        var dims = {};
+        d3.selectAll(".startup-block").each(function (v) {
+          console.log(v);
+          themes.forEach(function (w) {
+            if (w.key === v.parent.id) {
+              if (v.x0 < w.x0 || w.x0 === 0) {
+                w.x0 = v.x0;
+              }
+              if (v.y0 < w.y0 || w.y0 === 0) {
+                w.y0 = v.y0;
+              }
+              if (v.x1 > w.x1 || w.x1 === 0) {
+                w.x1 = v.x1;
+              }
+              if (v.y1 > w.y1 || w.y1 === 0) {
+                w.y1 = v.y1;
+              }
+            }
+            dims[w.key] = {
+              x0: w.x0,
+              y0: w.y0,
+              x1: w.x1,
+              y1: w.y1,
+              n: w.values.length,
+            };
+          });
+        });
+
+        console.log("dims", dims);
+
+        console.log("themes", themes);
+
+        d3.selectAll(".startup-block").each(function (v) {
+          place_image(v);
+        });
+
+        var img = new Image();
+        img.onload = function () {
+          var dimWidth = dims.rainmaking.x1 - dims.rainmaking.x0;
+          var dimHeight = dims.rainmaking.x1 - dims.rainmaking.x0;
+          var tmpW = this.width;
+          var tmpH = this.height;
+          var ratio = dimWidth / tmpW;
+          var projH = tmpH * ratio;
+          if (projH > dimHeight) {
+            var ratio = dimHeight / tmpH;
+            var projW = tmpW * ratio;
+            var projH = tmpH * ratio;
+            svg
+              .append("text")
+              .text("Created By")
+              .attr("class", "title-text")
+              .attr("x", dims.rainmaking.x0 + dimWidth / 2)
+              .attr("y", dims.rainmaking.y1 - projH + 10);
+            svg
+              .append("image")
+              .attr("xlink:href", "assets/logo1.png")
+              .attr("x", dims.rainmaking.x0)
+              .attr("y", dims.rainmaking.y1 - projH)
+              .attr("width", projW);
+          } else {
+            svg
+              .append("image")
+              .attr("xlink:href", "assets/logo1.png")
+              .attr("x", dims.rainmaking.x0)
+              .attr("y", dims.rainmaking.y1 - projH)
+              .attr("width", dimWidth);
+            svg
+              .append("text")
+              .text("Created By")
+              .attr("class", "title-text")
+              .attr("x", dims.rainmaking.x0 + dimWidth / 2)
+              .attr("y", dims.rainmaking.y1 - projH + 10);
+          }
+        };
+        img.src = "assets/logo1.png";
+
+        function place_image(data) {
+          var img = new Image();
+          img.onload = function () {
+            var dimWidth = data.x1 - data.x0;
+            var dimHeight = data.y1 - data.y0;
+            var tmpW = this.width;
+            var tmpH = this.height;
+            var ratio = dimWidth / tmpW;
+            var projH = tmpH * ratio;
+            var projW = tmpW * ratio;
+            if (projH > dimHeight) {
+              var ratio = dimHeight / tmpH;
+              var projW = tmpW * ratio;
+              var projH = tmpH * ratio;
+              svg
+                .append("image")
+                .attr("xlink:href", data.data["Logo (source)"])
+                .attr("x", data.x0 + (dimWidth - projW) / 2)
+                .attr("y", data.y0 + (dimHeight - projH) / 2)
+                .attr("width", projW);
+            } else {
+              svg
+                .append("image")
+                .attr("xlink:href", data.data["Logo (source)"])
+                .attr("x", data.x0 + (dimWidth - projW) / 2)
+                .attr("y", data.y0 + (dimHeight - projH) / 2)
+                .attr("width", dimWidth);
+            }
+          };
+          img.src = data.data["Logo (source)"];
+        }
+
+        themes.forEach(function (v) {
+          if (v.key !== "rainmaking") {
+            svg
+              .append("rect")
+              .attr("x", dims[v.key].x0 - 10)
+              .attr("y", dims[v.key].y0 - 10)
+              .attr("width", dims[v.key].x1 - dims[v.key].x0 + 20)
+              .attr("height", dims[v.key].y1 - dims[v.key].y0 + 20)
+              .attr("rx", 30)
+              .style("stroke", "black")
+              .style("stroke-width", "2px")
+              .attr("fill", "none");
+          }
+        });
+
+        // functions:
+        function formatURL(url) {
+          if (url.slice(0, 3) === "www") {
+            return "http://" + url;
+          } else {
+            return url;
+          }
+        }
+
+        function showNodeTooltip(d) {
+          d3.select(".node-tooltip-title").text(d.Company);
+          d3.select(".node-tooltip-description").text(
+            d["One Liner"].replace(/�۪/g, "'")
+          );
+
+          d3.select(".node-tooltip").style("opacity", 1);
+
+          const { width, height } = d3
+            .select(".node-tooltip")
+            .node()
+            .getBoundingClientRect();
+
+          let padding = 10;
+          let x = d3.event.clientX;
+          if (x + padding + width > window.innerWidth) {
+            x = x - padding - width;
+          } else {
+            x = x + padding;
+          }
+          let y = d3.event.clientY;
+          if (y + padding + height > window.innerHeight) {
+            y = y - padding - height;
+          } else {
+            y = y + padding;
+          }
+
+          nodes.attr("opacity", function (v) {
+            if (v.Company === d.Company) {
+              return 1;
+            } else {
+              return 0.3;
+            }
+          });
+
+          d3.select(".node-tooltip").style(
+            "transform",
+            `translate(${x}px,${y}px)`
+          );
+        }
+
+        function hideNodeTooltip() {
+          d3.select(".node-tooltip").style("opacity", 0);
+          nodes.attr("opacity", function (d) {
+            return d.opacity;
+          });
+        }
+
+        function round_to_precision(x, precision) {
+          var y = +x + (precision === undefined ? 0.5 : precision / 2);
+          return y - (y % (precision === undefined ? 1 : +precision));
+        }
+
+        const capitalize_word = (s) => {
+          if (typeof s !== "string") return "";
+          return s.charAt(0).toUpperCase() + s.slice(1);
+        };
+
+        function capitalize_sentence(string) {
+          var res = string.split(" ");
+          result_list = [];
+          for (i = 0; i < res.length; i++) {
+            result_list.push(capitalize_word(res[i]));
+          }
+          return result_list.join(" ");
+        }
+
+        function formatFunding(total_funding) {
+          fundingFormatted = total_funding;
+          if (total_funding <= 900000 && total_funding > 1000) {
+            fundingFormatted = Math.round(total_funding / 10) / 100 + "K";
+          }
+          if (total_funding > 900000) {
+            fundingFormatted = Math.round(total_funding / 10000) / 100 + "M";
+          }
+          return fundingFormatted;
+        }
+      });
+    </script>
+  </body>
+</html>
