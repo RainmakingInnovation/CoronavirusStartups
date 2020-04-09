@@ -341,7 +341,9 @@
                 .attr("width", projW)
                 .on("mouseover", function () {
                   showNodeTooltip(data.data);
-                });
+                  d3.select(this).attr("opacity", 1);
+                })
+                .on("mouseout", hideNodeTooltip);
             } else {
               svg
                 .append("image")
@@ -352,7 +354,9 @@
                 .attr("width", dimWidth)
                 .on("mouseover", function () {
                   showNodeTooltip(data.data);
-                });
+                  d3.select(this).attr("opacity", 1);
+                })
+                .on("mouseout", hideNodeTooltip);
             }
           };
           img.src = data.data["Logo (source)"];
@@ -383,6 +387,7 @@
         }
 
         function showNodeTooltip(d) {
+          d3.selectAll(".startup-logo").attr("opacity", 0.4);
           d3.select(".node-tooltip-title").text(d.Company);
           d3.select(".node-tooltip-description").text(
             d["One Liner"].replace(/�۪/g, "'")
@@ -417,9 +422,7 @@
 
         function hideNodeTooltip() {
           d3.select(".node-tooltip").style("opacity", 0);
-          nodes.attr("opacity", function (d) {
-            return d.opacity;
-          });
+          d3.selectAll(".startup-logo").attr("opacity", 1);
         }
 
         function round_to_precision(x, precision) {
