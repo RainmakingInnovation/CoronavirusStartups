@@ -31,6 +31,42 @@
         font-family: "Graphik Bold";
         text-anchor: middle;
       }
+
+      .startup-logo {
+        cursor: pointer;
+      }
+
+      .node-tooltip {
+        position: fixed;
+        z-index: 99999;
+        left: 0;
+        top: 0;
+        padding: 0.5em 1em;
+        background: rgba(255, 255, 255, 1);
+        pointer-events: none;
+        opacity: 0;
+        text-align: left;
+        text-anchor: start;
+        max-width: 400px;
+        font-size: 10px;
+        box-shadow: 0 4px 12px 0px rgba(0, 0, 0, 0.25);
+      }
+
+      .node-tooltip-title {
+        font-family: "Graphik Bold";
+        padding-top: 3px;
+        padding-bottom: 5px;
+      }
+
+      .node-tooltip-funding {
+        font-family: "Graphik Regular";
+        padding-bottom: 3px;
+      }
+
+      .node-tooltip-description {
+        font-family: "Graphik Regular";
+        padding-bottom: 3px;
+      }
     </style>
   </head>
 
@@ -299,16 +335,24 @@
               svg
                 .append("image")
                 .attr("xlink:href", data.data["Logo (source)"])
+                .attr("class", "startup-logo")
                 .attr("x", data.x0 + (dimWidth - projW) / 2)
                 .attr("y", data.y0 + (dimHeight - projH) / 2)
-                .attr("width", projW);
+                .attr("width", projW)
+                .on("mouseover", function () {
+                  showNodeTooltip(data.data);
+                });
             } else {
               svg
                 .append("image")
                 .attr("xlink:href", data.data["Logo (source)"])
+                .attr("class", "startup-logo")
                 .attr("x", data.x0 + (dimWidth - projW) / 2)
                 .attr("y", data.y0 + (dimHeight - projH) / 2)
-                .attr("width", dimWidth);
+                .attr("width", dimWidth)
+                .on("mouseover", function () {
+                  showNodeTooltip(data.data);
+                });
             }
           };
           img.src = data.data["Logo (source)"];
@@ -364,14 +408,6 @@
           } else {
             y = y + padding;
           }
-
-          nodes.attr("opacity", function (v) {
-            if (v.Company === d.Company) {
-              return 1;
-            } else {
-              return 0.3;
-            }
-          });
 
           d3.select(".node-tooltip").style(
             "transform",
