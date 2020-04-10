@@ -139,8 +139,6 @@
 
         data = new_data;
 
-        console.log("data", data);
-
         var themes = d3
           .nest()
           .key(function (d) {
@@ -169,8 +167,6 @@
           key: "rainmaking",
           values: [],
         });
-
-        console.log("themes", themes);
 
         themes.forEach(function (v) {
           data.push({ Company: v.key, Theme: "origin", value: "" });
@@ -204,8 +200,6 @@
           .tile(d3.treemapSquarify.ratio(2))
           .size([width, height])
           .padding(10)(root);
-
-        console.log("root.leaves()", root.leaves());
 
         // use this information to add rectangles:
         svg
@@ -241,6 +235,7 @@
           .attr("opacity", 0);
 
         themes.forEach(function (v) {
+          v.levels = [];
           v.x0 = 0;
           v.y0 = 0;
           v.x1 = 0;
@@ -250,7 +245,6 @@
         // get dims:
         var dims = {};
         d3.selectAll(".startup-block").each(function (v) {
-          console.log(v);
           themes.forEach(function (w) {
             if (w.key === v.parent.id) {
               if (v.x0 < w.x0 || w.x0 === 0) {
@@ -265,6 +259,9 @@
               if (v.y1 > w.y1 || w.y1 === 0) {
                 w.y1 = v.y1;
               }
+              if (w.levels.indexOf(v.y0) <= 0) {
+                w.levels.push(v.y0);
+              }
             }
             dims[w.key] = {
               x0: w.x0,
@@ -272,13 +269,10 @@
               x1: w.x1,
               y1: w.y1,
               n: w.values.length,
+              levels: w.levels.length,
             };
           });
         });
-
-        console.log("dims", dims);
-
-        console.log("themes", themes);
 
         d3.selectAll(".startup-block").each(function (v) {
           place_image(v);
@@ -329,7 +323,7 @@
           var img = new Image();
           img.onload = function () {
             var dimWidth = data.x1 - data.x0;
-            var dimHeight = data.y1 - data.y0;
+            var dimHeight = data.y1 - data.y0 - 10;
             var tmpW = this.width;
             var tmpH = this.height;
             var ratio = dimWidth / tmpW;
@@ -344,7 +338,7 @@
                 .attr("xlink:href", data.data["Logo (source)"])
                 .attr("class", "startup-logo")
                 .attr("x", data.x0 + (dimWidth - projW) / 2)
-                .attr("y", data.y0 + (dimHeight - projH) / 2)
+                .attr("y", data.y0 + 10 + (dimHeight - projH) / 2)
                 .attr("width", projW)
                 .on("mouseover", function () {
                   showNodeTooltip(data.data);
@@ -357,7 +351,7 @@
                 .attr("xlink:href", data.data["Logo (source)"])
                 .attr("class", "startup-logo")
                 .attr("x", data.x0 + (dimWidth - projW) / 2)
-                .attr("y", data.y0 + (dimHeight - projH) / 2)
+                .attr("y", data.y0 + 10 + (dimHeight - projH) / 2)
                 .attr("width", dimWidth)
                 .on("mouseover", function () {
                   showNodeTooltip(data.data);
@@ -378,6 +372,8 @@
               .attr("width", dims[v.key].x1 - dims[v.key].x0 + 20)
               .attr("height", dims[v.key].y1 - dims[v.key].y0 + 20)
               .attr("rx", 30)
+              .attr("class", "theme-box")
+              .attr("id", v.key.replace(/ /g, "-") + "-box")
               .style("stroke", "#A2A2A2")
               .style("stroke-width", "2px")
               .attr("fill", "none");
@@ -387,7 +383,7 @@
               .text(v.key)
               .attr("class", "section-label")
               .attr("x", dims[v.key].x0 + (dims[v.key].x1 - dims[v.key].x0) / 2)
-              .attr("y", dims[v.key].y0 + 2);
+              .attr("y", dims[v.key].y0 + 5);
           }
         });
 
@@ -408,13 +404,18 @@
           );
 
           d3.select(".node-tooltip").style("opacity", 1);
+          d3.selectAll(".theme-box").style("opacity", 0.4);
+          d3.select("#" + d["Theme"].replace(/ /g, "-") + "-box").style(
+            "opacity",
+            1
+          );
 
           const { width, height } = d3
             .select(".node-tooltip")
             .node()
             .getBoundingClientRect();
 
-          let padding = 10;
+          let padding = 15;
           let x = d3.event.clientX;
           if (x + padding + width > window.innerWidth) {
             x = x - padding - width;
@@ -437,6 +438,7 @@
         function hideNodeTooltip() {
           d3.select(".node-tooltip").style("opacity", 0);
           d3.selectAll(".startup-logo").attr("opacity", 1);
+          d3.selectAll(".theme-box").style("opacity", 1);
         }
 
         function round_to_precision(x, precision) {
